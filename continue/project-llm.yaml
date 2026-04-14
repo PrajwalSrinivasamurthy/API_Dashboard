@@ -1,0 +1,22 @@
+
+name: Project LLM (local proxy)
+version: 1.0.0
+schema: v1
+
+models:
+  - name: GPT-5 (project proxy)
+    provider: openai
+    model: gpt-5
+    
+    useResponsesApi: false
+    
+    apiBase: http://127.0.0.1:9000 #this is ddeployed service url
+    
+    apiKey: REPLACE_WITH_YOUR_SK_PROJ_KEY
+    roles:
+      - chat
+      - edit
+      - apply
+
+#this is just a placeholder file not a real file , 
+#maybe we can upload this to repo and deploy right now config.yaml is being used 
