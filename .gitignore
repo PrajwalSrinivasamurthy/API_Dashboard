@@ -9,6 +9,10 @@ frontend/.env.local
 !frontend/.env.example
 *.pem
 
+# Backend log files (directory kept via logs/.gitkeep)
+backend/logs/*.log
+backend/logs/*.log.*
+
 # Python
 backend/.venv/
 backend/venv/
@@ -43,6 +47,7 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
@@ -50,7 +55,3 @@ Thumbs.db
 # Continue IDE — local workspace config (not in repo; use continue/project-llm.yaml as template)
 .continue/
 
-
-README.md
-README1.md
-readme2.md

@@ -2,6 +2,7 @@
 
 import json
 import secrets
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Annotated, List
 
@@ -9,9 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.database import get_db
 from app.deps import require_admin
-from app.models import DashboardUser, ProjectKey, UsageLog
+from app.models import DashboardUser, ProjectKey, ProjectKeyReveal, UsageLog
 from app.schemas import (
     AdminUpdateDashboardUserPasswordRequest,
     AdminUsageResponse,
@@ -50,6 +52,16 @@ async def _json_object_body(request: Request) -> dict:
 async def list_project_keys(session: Annotated[AsyncSession, Depends(get_db)]):
     result = await session.execute(select(ProjectKey).order_by(ProjectKey.id.desc()))
     rows = result.scalars().all()
+    if not rows:
+        return []
+    pids = [r.id for r in rows]
+    spent_q = (
+        select(UsageLog.project_key_id, func.coalesce(func.sum(UsageLog.cost), 0))
+        .where(UsageLog.project_key_id.in_(pids))
+        .group_by(UsageLog.project_key_id)
+    )
+    spent_res = await session.execute(spent_q)
+    spent_map = {pid: Decimal(str(s or 0)).quantize(Decimal("0.000001")) for pid, s in spent_res.all()}
     return [
         ProjectKeyAdminItem(
             id=r.id,
@@ -57,6 +69,9 @@ async def list_project_keys(session: Annotated[AsyncSession, Depends(get_db)]):
             active=r.active,
             used_tokens=int(r.used_tokens or 0),
             created_at=r.created_at,
+            allowed_client_ip=r.allowed_client_ip,
+            budget_usd=Decimal(str(r.budget_usd or 0)).quantize(Decimal("0.01")),
+            spent_usd=spent_map.get(r.id, Decimal("0")),
         )
         for r in rows
     ]
@@ -72,7 +87,22 @@ async def create_key(
     session.add(row)
     await session.flush()
     await session.refresh(row)
-    return CreateProjectKeyResponse(id=row.id, key=raw, name=row.name, active=row.active)
+    ttl_hours = get_settings().jwt_expire_hours
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
+    reveal = ProjectKeyReveal(
+        token=secrets.token_urlsafe(32),
+        project_key_id=row.id,
+        expires_at=expires_at,
+    )
+    session.add(reveal)
+    await session.flush()
+    return CreateProjectKeyResponse(
+        id=row.id,
+        name=row.name,
+        active=row.active,
+        reveal_token=reveal.token,
+        reveal_expires_at=reveal.expires_at,
+    )
 
 
 @router.post("/disable-key", status_code=status.HTTP_204_NO_CONTENT)

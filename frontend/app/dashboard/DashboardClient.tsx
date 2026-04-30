@@ -131,8 +131,13 @@ export function DashboardClient({
         setError(data?.detail ?? `Create failed (${r.status})`);
         return;
       }
-      if (data && "key" in data) {
-        setCreatedKey(data);
+      if (data && data.reveal_token) {
+        const origin =
+          typeof window !== "undefined" ? window.location.origin : "";
+        setCreatedKey({
+          ...data,
+          revealUrl: `${origin}/vk/${data.reveal_token}`,
+        });
         setNewName("");
         await refreshAll();
       }
@@ -368,7 +373,7 @@ export function DashboardClient({
           [
             ["overview", "Usage overview"],
             ["keys", "Project keys"],
-            ["new-key", "New key"],
+            ["new-key", "Virtual key"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -487,6 +492,9 @@ export function DashboardClient({
                       <th className="px-4 py-3 font-medium">Active</th>
                       <th className="px-4 py-3 font-medium">Used tokens</th>
                       <th className="px-4 py-3 font-medium">Created</th>
+                      <th className="px-4 py-3 font-medium">Bound IP</th>
+                      <th className="px-4 py-3 font-medium">Budget</th>
+                      <th className="px-4 py-3 font-medium">Spent</th>
                       <th className="px-4 py-3 font-medium">Actions</th>
                     </tr>
                   </thead>
@@ -517,6 +525,15 @@ export function DashboardClient({
                         <td className="px-4 py-3 text-[var(--muted)]">
                           {fmtDate(k.created_at)}
                         </td>
+                        <td className="px-4 py-3 font-mono text-xs text-[var(--muted)]">
+                          {k.allowed_client_ip ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--muted)]">
+                          {fmtUsd(k.budget_usd)}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--muted)]">
+                          {fmtUsd(k.spent_usd)}
+                        </td>
                         <td className="px-4 py-3">
                           {k.active ? (
                             <button
@@ -537,8 +554,8 @@ export function DashboardClient({
               </div>
             ) : (
               <p className="px-4 py-8 text-[var(--muted)]">
-                No project keys yet. Open the <strong>New key</strong> tab to
-                create one.
+                No project keys yet. Open the <strong>Virtual key</strong> tab
+                to create one.
               </p>
             )}
           </div>
@@ -548,12 +565,11 @@ export function DashboardClient({
       {tab === "new-key" && (
         <section className="max-w-xl space-y-6">
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-            <h2 className="text-sm font-medium text-white">
-              POST /admin/create-key
-            </h2>
+            <h2 className="text-sm font-medium text-white">Create virtual key</h2>
             <p className="mt-1 text-xs text-[var(--muted)]">
-              Generates a secure <code className="rounded bg-black/30 px-1">sk_proj_…</code>{" "}
-              key and stores it in <code className="rounded bg-black/30 px-1">project_keys</code>.
+              Creates a <code className="rounded bg-black/30 px-1">sk_proj_…</code> key and a{" "}
+              <strong>one-time link</strong> you can send. The recipient opens the link, copies the
+              key once, and the link stops working (same lifetime as your dashboard session JWT).
             </p>
             <form onSubmit={handleCreate} className="mt-4 space-y-4">
               <div>
@@ -579,29 +595,33 @@ export function DashboardClient({
                 disabled={creating || !newName.trim()}
                 className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
               >
-                {creating ? "Creating…" : "Generate key"}
+                {creating ? "Creating…" : "Create virtual key"}
               </button>
             </form>
           </div>
 
-          {createdKey && (
+          {createdKey?.revealUrl && (
             <div className="rounded-xl border border-[var(--success)]/40 bg-[var(--success)]/10 p-6">
               <h3 className="text-sm font-semibold text-[var(--success)]">
-                Key created — copy now
+                Share this one-time link
               </h3>
               <p className="mt-1 text-xs text-[var(--muted)]">
                 {createdKey.message ??
-                  "This secret is not stored in the UI after you leave."}
+                  "The virtual key is not shown here. Send the link; it expires after first view or when the time below passes."}
               </p>
-              <pre className="mt-3 overflow-x-auto rounded-lg bg-black/40 p-3 font-mono text-xs text-white">
-                {createdKey.key}
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                Link valid until:{" "}
+                <span className="text-white">{fmtDate(createdKey.reveal_expires_at)}</span>
+              </p>
+              <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-black/40 p-3 font-mono text-xs leading-relaxed text-white">
+                {createdKey.revealUrl}
               </pre>
               <button
                 type="button"
-                onClick={() => void copyText(createdKey.key)}
+                onClick={() => void copyText(createdKey.revealUrl!)}
                 className="mt-3 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-white hover:bg-white/5"
               >
-                Copy key
+                Copy link
               </button>
             </div>
           )}

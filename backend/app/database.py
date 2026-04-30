@@ -9,7 +9,7 @@ from app.config import get_settings
 
 
 class Base(DeclarativeBase):
-    pass
+    """Shared declarative base."""
 
 
 settings = get_settings()

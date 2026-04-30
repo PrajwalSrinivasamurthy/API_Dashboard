@@ -11,13 +11,26 @@ Admin UI for **project keys** and **usage** (maps to `project_keys` and aggregat
 
 ## Setup
 
+### Docker local stack (recommended)
+
+From repo root:
+
+```bash
+cp .env.docker.example .env
+docker compose up --build
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Native setup
+
 ```bash
 cd frontend
 npm install
 cp .env.example .env.local
 ```
 
-Edit **`.env.local`**: `BACKEND_URL`, `ADMIN_API_KEY`, **`JWT_SECRET`** (same value as backend `JWT_SECRET`).
+Edit **`.env.local`**: `BACKEND_URL`, `ADMIN_API_KEY`, **`JWT_SECRET`** (same value as backend `JWT_SECRET`), and optionally **`JWT_EXPIRE_HOURS`** (default **5**, must match backend for login cookie lifetime).
 
 ```bash
 npm run dev
@@ -38,7 +51,7 @@ Open [http://localhost:3000](http://localhost:3000) — you are redirected to **
 |-----|---------|
 | **Usage overview** | `GET /admin/usage` — totals + per-project table |
 | **Project keys** | `GET /admin/project-keys` — table + disable → `POST /admin/disable-key` |
-| **New key** | `POST /admin/create-key` — shows full key once |
+| **Virtual key** | `POST /admin/create-key` — returns a **one-time share link** (`/vk/…`); recipient opens it once to copy the key |
 
 ## Production
 

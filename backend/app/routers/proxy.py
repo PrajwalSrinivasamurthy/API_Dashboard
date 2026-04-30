@@ -4,7 +4,8 @@ import hashlib
 import json
 import logging
 import time
-from typing import Annotated, Dict, Optional
+from decimal import Decimal
+from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -12,18 +13,26 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.client_ip import get_client_ip
 from app.config import get_settings
 from app.database import get_db
 from app.deps import get_project_key_id_from_middleware
-from app.models import ProjectKey, UsageLog
+from app.models import ProjectKey, ProjectKeySecurityEvent, UsageLog
+from app.services.audit_log import log_audit
 from app.services.pricing import estimate_cost_usd
+from app.services.teams_webhook import post_teams_text
+from app.services.usage_limits import (
+    total_spent_usd,
+    upper_bound_request_cost_usd,
+    upper_bound_request_tokens,
+    window_usage_stats,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["proxy"])
 
 
 def _normalize_upstream_error(data: object) -> dict:
-    # Some upstream error payloads arrive as a one-element list; clients expect `{ "error": … }`.
     if isinstance(data, list) and data and isinstance(data[0], dict):
         first = data[0]
         if "error" in first:
@@ -44,7 +53,7 @@ _OPENAI_TOOL_CALL_ID_MAX = 64
 
 
 def _short_tool_call_id(raw: str, memo: dict[str, str]) -> str:
-    """OpenAI rejects tool_calls[].id longer than 64 chars; some clients send huge ids."""
+    """OpenAI rejects tool call IDs longer than 64 chars."""
     if len(raw) <= _OPENAI_TOOL_CALL_ID_MAX:
         return raw
     if raw not in memo:
@@ -53,13 +62,9 @@ def _short_tool_call_id(raw: str, memo: dict[str, str]) -> str:
 
 
 def _sanitize_openai_tool_call_ids(
-    payload: object, memo: Optional[Dict[str, str]] = None
+    payload: object, memo: dict[str, str] | None = None
 ) -> None:
-    """
-    OpenAI requires tool_calls[].id and tool messages' tool_call_id length <= 64.
-    Continue sometimes sends 400+ char ids. Walk the whole request JSON so we never miss
-    a shape (odd role values, nested copies, etc.).
-    """
+    """Ensure tool call IDs are <= 64 chars across the full payload."""
     if memo is None:
         memo = {}
 
@@ -96,12 +101,8 @@ async def chat_completions(
     model = payload.get("model")
     model_name = model if isinstance(model, str) else None
 
-    # Stability mode: many IDE clients stream by default, but stream transport
-    # can be interrupted and produce cut responses. Convert to non-stream
-    # upstream requests for reliability and consistent usage tracking.
     if requested_stream:
         payload["stream"] = False
-    # OpenAI rejects stream_options unless stream is true (Continue may send both).
     if payload.get("stream") is not True:
         payload.pop("stream_options", None)
 
@@ -114,6 +115,83 @@ async def chat_completions(
         raise HTTPException(status_code=401, detail="Invalid or inactive project key")
 
     settings = get_settings()
+    client_ip = (get_client_ip(request) or "").strip() or None
+    budget_cap = Decimal(str(project_key.budget_usd or 0)).quantize(Decimal("0.01"))
+    spent_prior = await total_spent_usd(session, project_key_id)
+    upper_cost = upper_bound_request_cost_usd(model_name, payload)
+
+    if spent_prior + upper_cost > budget_cap:
+        session.add(
+            ProjectKeySecurityEvent(
+                project_key_id=project_key_id,
+                event_type="budget_blocked",
+                client_ip=client_ip,
+                detail=f"spent={spent_prior}; est_max={upper_cost}; cap={budget_cap}"[:2000],
+            )
+        )
+        log_audit(
+            "proxy.budget_blocked",
+            outcome="denied",
+            request=request,
+            extra={
+                "http_status": 402,
+                "project_key_id": project_key_id,
+                "project_key_name": project_key.name,
+                "spent_usd": str(spent_prior),
+                "budget_cap_usd": str(budget_cap),
+            },
+        )
+        return JSONResponse(
+            status_code=402,
+            content={
+                "error": {
+                    "message": f"Project key budget cap reached (${budget_cap}).",
+                }
+            },
+        )
+
+    win_sec = settings.spike_window_seconds
+    w_cnt, w_cost, w_toks = await window_usage_stats(session, project_key_id, win_sec)
+    upper_toks = upper_bound_request_tokens(payload)
+    spike_cost_cap = Decimal(str(settings.spike_max_cost_usd)).quantize(Decimal("0.000001"))
+
+    spike_detail = None
+    if w_cnt >= settings.spike_max_requests:
+        spike_detail = f"requests_in_{win_sec}s={w_cnt}; max={settings.spike_max_requests}"
+    elif w_cost + upper_cost > spike_cost_cap:
+        spike_detail = f"cost_in_window={w_cost}; est_add={upper_cost}; max={spike_cost_cap}"
+    elif w_toks + upper_toks > settings.spike_max_tokens:
+        spike_detail = f"tokens_in_window={w_toks}; est_add={upper_toks}; max={settings.spike_max_tokens}"
+
+    if spike_detail:
+        session.add(
+            ProjectKeySecurityEvent(
+                project_key_id=project_key_id,
+                event_type="spike_blocked",
+                client_ip=client_ip,
+                detail=spike_detail[:2000],
+            )
+        )
+        log_audit(
+            "proxy.spike_blocked",
+            outcome="denied",
+            request=request,
+            extra={
+                "http_status": 429,
+                "project_key_id": project_key_id,
+                "project_key_name": project_key.name,
+                "detail": spike_detail[:500] if spike_detail else None,
+            },
+        )
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": {
+                    "message": "Spike limit exceeded for this project key. Retry later.",
+                }
+            },
+        )
+
     upstream = f"{settings.openai_base_url.rstrip('/')}/chat/completions"
     fwd = {
         "Authorization": f"Bearer {settings.openai_api_key}",
@@ -157,6 +235,38 @@ async def chat_completions(
         )
     )
     project_key.used_tokens = int(project_key.used_tokens or 0) + tt
+
+    await session.flush()
+    spent_after = await total_spent_usd(session, project_key_id)
+    frac = Decimal(str(settings.budget_threshold_fraction))
+    threshold_amt = (budget_cap * frac).quantize(Decimal("0.01"))
+    if spent_after >= threshold_amt and not project_key.budget_warn_sent:
+        session.add(
+            ProjectKeySecurityEvent(
+                project_key_id=project_key_id,
+                event_type="budget_threshold",
+                client_ip=client_ip,
+                detail=f"spent={spent_after}; threshold={threshold_amt}; cap={budget_cap}"[:2000],
+            )
+        )
+        project_key.budget_warn_sent = True
+        pct = float(settings.budget_threshold_fraction) * 100.0
+        await post_teams_text(
+            f"Budget threshold ({pct:.0f}%) reached for key **{project_key.name}** (id {project_key_id}): "
+            f"~{spent_after} USD spent of {budget_cap} USD cap."
+        )
+        log_audit(
+            "proxy.budget_threshold",
+            outcome="warn",
+            request=request,
+            extra={
+                "project_key_id": project_key_id,
+                "project_key_name": project_key.name,
+                "spent_usd": str(spent_after),
+                "threshold_usd": str(threshold_amt),
+                "budget_cap_usd": str(budget_cap),
+            },
+        )
 
     if requested_stream:
         created = int(time.time())

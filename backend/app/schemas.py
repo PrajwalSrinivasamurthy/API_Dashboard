@@ -13,10 +13,17 @@ class CreateProjectKeyRequest(BaseModel):
 
 class CreateProjectKeyResponse(BaseModel):
     id: int
-    key: str
     name: str
     active: bool
-    message: str = "Store this key securely; it will not be shown again."
+    reveal_token: str
+    reveal_expires_at: datetime
+    message: str = (
+        "Share the one-time link. The virtual key appears once when opened, then the link stops working."
+    )
+
+
+class RevealVirtualKeyResponse(BaseModel):
+    key: str
 
 
 class DisableKeyRequest(BaseModel):
@@ -30,6 +37,9 @@ class ProjectKeyAdminItem(BaseModel):
     active: bool
     used_tokens: int
     created_at: datetime
+    allowed_client_ip: Optional[str] = None
+    budget_usd: Decimal
+    spent_usd: Decimal
 
 
 class UsagePerProject(BaseModel):
