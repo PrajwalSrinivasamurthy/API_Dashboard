@@ -38,6 +38,12 @@ function LoginForm() {
       }
       router.replace("/dashboard");
       router.refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(
+        msg ||
+          "Network error calling /api/auth/login. Check the browser Network tab and server logs."
+      );
     } finally {
       setSubmitting(false);
     }
