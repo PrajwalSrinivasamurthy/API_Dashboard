@@ -1,5 +1,3 @@
-"""Admin APIs (X-Admin-Key)."""
-
 import json
 import secrets
 from datetime import datetime, timedelta, timezone

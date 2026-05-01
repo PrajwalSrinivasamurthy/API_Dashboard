@@ -4,43 +4,13 @@ FastAPI service: **`x-project-key`** on `POST /v1/chat/completions` → **OpenAI
 
 ## Setup
 
-### Quick Docker local stack (backend + frontend + SQL Server)
-
-From repo root:
-
-```bash
-docker compose up --build
-```
-
-Then:
-
-- Frontend: [http://localhost:3000](http://localhost:3000)
-- Backend health: [http://localhost:8000/health](http://localhost:8000/health)
-
-Before first real use, run `sql/schema.sql` against the SQL Server container (`127.0.0.1:1433`) using Azure Data Studio / SQL extension, or `sqlcmd`.
-
-Common env overrides in **repo root** `.env` (Compose reads this file automatically):
-
-- `OPENAI_API_KEY`
-- `ADMIN_API_KEY`
-- `JWT_SECRET`
-- **`DATABASE_URL`** — optional. Full `mssql+aioodbc://…` string to use a **remote** SQL Server (SSMS / Azure). If **unset**, Compose defaults to the bundled **`sqlserver`** container on `sqlserver:1433` using `MSSQL_*` below.
-- `MSSQL_SA_PASSWORD` and `MSSQL_SA_PASSWORD_URLENC` (only affect the default URL when `DATABASE_URL` is unset)
-- `MSSQL_DB_NAME` (defaults to `master`)
-
-**Native `uvicorn` (no Docker):** set `DATABASE_URL` in **`backend/.env`** (see **`.env.example`**).
-
-### Native (non-Docker) setup
-
 1. **SQL Server** (SSMS / Azure SQL / on-prem): create an empty database, then run the T-SQL script:
 
 - Open **`sql/schema.sql`** in **SQL Server Management Studio**, connect to your server, select the target database, and execute the script (or use **`sqlcmd`** with `-d YourDatabase -i sql/schema.sql`).
 
-**macOS:** Microsoft does not ship a native “SQL Server.app” for Mac. Use **Docker** to run the engine locally: from the **repo root**, run **`docker compose up -d`** (see root **`docker-compose.yml`**; default `sa` password is in that file — change it for anything beyond local dev). On Apple Silicon, Docker may pull the **linux/amd64** image (emulation); that is normal.
+**macOS / Linux dev:** there is no local SQL Server engine in this repo. Point **`DATABASE_URL`** in **`backend/.env`** at **Azure SQL**, a **remote Windows SQL Server**, or another reachable instance. Install **ODBC Driver 18 for SQL Server** on the machine that runs Python ([macOS](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/install-microsoft-odbc-driver-sql-server-macos), [Linux](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server)). You typically need **unixODBC** on macOS (`brew install unixodbc`).
 
-Use a **Cursor / VS Code extension** only as a **client** (e.g. Microsoft’s **SQL Server (mssql)** or **Azure Data Studio**) to connect to `127.0.0.1,1433`, create a database, and execute **`sql/schema.sql`**. Extensions do **not** replace the server; they talk to SQL Server in Docker (or Azure).
-
-Install the **ODBC Driver 18 for SQL Server** on the Mac that runs **Python** ([install on macOS](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/install-microsoft-odbc-driver-sql-server-macos)). You typically need **unixODBC** as well (`brew install unixodbc`).
+Use **Azure Data Studio** or a **VS Code SQL extension** as a client to run **`sql/schema.sql`** against that server.
 
 If the database already existed before **`dashboard_users`** was added, run **`sql/migration_dashboard_users.sql`** once (idempotent).
 
@@ -54,13 +24,14 @@ If **`hmac_nonces`** is missing (HMAC replay protection), run **`sql/migration_h
 
 **Virtual key + IP:** When someone opens **`GET /public/vk/{token}`**, the server stores their client IP on that **`project_keys`** row. After that, **`POST /v1/chat/completions`** with that key only succeeds from the **same IP** (see `X-Forwarded-For` / `CF-Connecting-IP` / `X-Real-IP` / TCP peer). Open the reveal link through the **same Next.js host** you use in production so the real browser IP is forwarded. Keys with **`allowed_client_ip` NULL** (e.g. old rows) are not IP-restricted until a reveal runs.
 
-2. Python 3.9+:
+2. Python 3.9+ — from the **repo root** (installs backend + hmac-proxy dependencies):
 
 ```bash
-cd backend
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python -m pip install -U pip
 pip install -r requirements.txt
+cd backend
 cp .env.example .env
 ```
 
@@ -89,9 +60,6 @@ Edit `.env` (see `.env.example` for patterns):
 | `LOG_DIR` | Optional. Default **`logs`** (folder under **`backend/`**). |
 | `DEV_LOG_FILE` / `AUDIT_LOG_FILE` | Optional. Defaults **`dev.log`** and **`audit.log`**. |
 | `LOG_LEVEL` | Optional. Default **INFO**; use **DEBUG** for more developer detail under the **`app`** logger. |
-| `LOG_ENCRYPTION_KEY` | Optional. **Fernet** key (url-safe base64). If set, encrypts on-disk log files per **`LOG_ENCRYPT_*`** (invalid key → startup error). |
-| `LOG_ENCRYPT_AUDIT` | Optional. Default **true** when encryption is used — encrypt **`audit.log`**. |
-| `LOG_ENCRYPT_DEV` | Optional. Default **false** — set **true** to encrypt **`dev.log`** on disk too. |
 
 3. Run:
 
@@ -118,15 +86,13 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 **Dashboard whitelist:** Table **`dashboard_users`** (`email`, bcrypt **`password_hash`**). There is no public signup; add rows via **`POST /admin/dashboard-users`** or SQL after hashing a password in Python (`app/services/passwords.py`).
 
-**Security:** `OPENAI_API_KEY` is never returned to clients. Usage is logged from the **non-stream** upstream response (see `app/routers/proxy.py`). Each key has a **`budget_usd`** (default **$25**), **spike limits** over a rolling window, and **`project_key_security_events`** rows for **ip_mismatch**, **hmac_signature_invalid**, **hmac_replay_blocked**, **budget_blocked**, **spike_blocked**, and **budget_threshold**.  
+**Security:** `OPENAI_API_KEY` is never returned to clients. Usage is logged from the **non-stream** upstream response (see `app/routers/proxy.py`). Each key has a **`budget_usd`** (default **$25**), **spike limits** over a rolling window, and **`project_key_security_events`** rows for **ip_mismatch**, **hmac_missing**, **hmac_misconfigured**, **hmac_timestamp_invalid**, **hmac_signature_invalid**, **hmac_replay_blocked**, **budget_blocked**, **spike_blocked**, and **budget_threshold**.  
 When `ENABLE_HMAC_CHECK=true`, sign each request with:
 - `x-timestamp`: unix epoch seconds
 - `x-nonce`: unique random string (single-use within TTL)
 - `x-signature`: `hex(hmac_sha256((HMAC_SIGNING_SECRET + ":" + project_key), METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + sha256(raw_body_bytes).hexdigest()))`
 
 **Logs:** With default settings, **`backend/logs/dev.log`** receives application logs (developers: set **`LOG_LEVEL=DEBUG`**). **`backend/logs/audit.log`** receives one **JSON object per line** for IT: **`admin.http`** (every `/admin/*` request with status and duration), **`dashboard.login`** / **`dashboard.change_password`**, **`vk.reveal`**, **`proxy.*`** security/limit events (no API keys or raw project keys). Configure via **`LOG_DIR`**, **`LOG_TO_FILES`**, etc. (see **`.env.example`**).
-
-**Encrypting log files (optional):** Set **`LOG_ENCRYPTION_KEY`** to a **Fernet** key (generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`). By default only **`audit.log`** is encrypted on disk (**`LOG_ENCRYPT_AUDIT=true`**, **`LOG_ENCRYPT_DEV=false`**); set **`LOG_ENCRYPT_DEV=true`** to encrypt **`dev.log`** too. **Stdout/stderr stay plaintext** so operators can still `docker logs` without the key. Decrypt a file: **`python scripts/decrypt_log_file.py logs/audit.log`** with **`LOG_ENCRYPTION_KEY`** in the environment (or **`--key-file`**). The key in **`.env`** protects against disk theft only if the secret is stored separately (e.g. vault, KMS-injected env); for many deployments **full-disk encryption** (BitLocker, LUKS, encrypted cloud volumes) or **shipping logs to a SIEM over TLS** is simpler than app-level crypto.
 
 ## `app/` package layout
 
@@ -136,7 +102,7 @@ Python package root for the FastAPI app. Imports use the `app.` prefix (e.g. `fr
 |---------------|------|
 | `__init__.py` | Marks `app` as a package. |
 | **`main.py`** | App entry: loads `backend/.env`, builds `FastAPI`, adds CORS + project-key middleware, mounts routers (`/v1`, `/admin`), `/health`, validation error handler. **`lifespan`** disposes the DB engine on shutdown. |
-| **`config.py`** | **`Settings`**: typed env (`DATABASE_URL`, `OPENAI_*`, `ADMIN_API_KEY`, `JWT_*`, `CORS_ORIGINS`, `PRICING_JSON`, optional **`TEAMS_WEBHOOK_URL`**, **spike** / **budget threshold** knobs). **`get_settings()`** is cached. **`ensure_async_mssql`** normalizes `mssql://` / `sqlserver://` → **`mssql+aioodbc://`**. PostgreSQL URLs are rejected. **`parse_pricing_json`** parses `PRICING_JSON` into per-model USD rates. |
+| **`config.py`** | **`Settings`**: typed env (`DATABASE_URL`, `OPENAI_*`, `ADMIN_API_KEY`, `JWT_*`, `CORS_ORIGINS`, `PRICING_JSON`, optional **`TEAMS_*`** (webhook, Adaptive Card, notify flags), **HMAC**, **spike** / **budget threshold** knobs). **`get_settings()`** is cached. **`ensure_async_mssql`** normalizes `mssql://` / `sqlserver://` → **`mssql+aioodbc://`**. PostgreSQL URLs are rejected. **`parse_pricing_json`** parses `PRICING_JSON` into per-model USD rates. |
 | **`database.py`** | **`Base`**: SQLAlchemy declarative base. **`engine`** / **`async_session_factory`**: async SQL Server (**aioodbc**). **`get_db`**: FastAPI dependency that yields a session and **commits** on success, **rolls back** on error. |
 | **`models.py`** | ORM: **`ProjectKey`** (includes **`budget_usd`**, **`budget_warn_sent`**), **`UsageLog`**, **`DashboardUser`**, **`ProjectKeyReveal`**, **`ProjectKeySecurityEvent`**. |
 | **`schemas.py`** | Pydantic models for admin JSON: create/disable key, list keys, **`AdminUsageResponse`** / **`UsagePerProject`**, etc. Separates API shape from ORM. |
@@ -145,8 +111,7 @@ Python package root for the FastAPI app. Imports use the `app.` prefix (e.g. `fr
 | **`routers/proxy.py`** | **`POST /v1/chat/completions`**: **budget** + **spike** gates (before upstream); forwards to OpenAI with server key. If **`stream: true`**, forces non-stream upstream, then returns JSON or a short **SSE** for IDE clients. Logs **`UsageLog`**, updates **`used_tokens`**; **`budget_threshold`** + Teams once. **`_normalize_upstream_error`**, **`_as_sse_line`**. |
 | **`services/usage_limits.py`** | **`total_spent_usd`**, **`window_usage_stats`**, conservative cost/token upper bounds for gating. |
 | **`services/teams_webhook.py`** | **`post_teams_text`**: optional **`TEAMS_WEBHOOK_URL`** POST. |
-| **`logging_config.py`** | **`configure_logging()`**: rotating **`dev.log`** + **`audit.log`** under **`LOG_DIR`**; optional **Fernet** encryption via **`LOG_ENCRYPTION_KEY`**. |
-| **`fernet_rotating_file_handler.py`** | **`FernetRotatingFileHandler`**: one ciphertext line per log record when encryption is enabled. |
+| **`logging_config.py`** | **`configure_logging()`**: rotating **`dev.log`** + **`audit.log`** under **`LOG_DIR`**. |
 | **`services/audit_log.py`** | **`log_audit(...)`**: JSON lines to **`app.audit`** (IT file). |
 | **`middleware/audit_http.py`** | **`AuditHttpMiddleware`**: records each completed **`/admin/*`** HTTP call (method, path, status, client IP, duration). |
 | **`routers/auth.py`** | **`/auth/login`**, **`/auth/change-password`** — whitelist check against **`dashboard_users`**, JWT issuance. |

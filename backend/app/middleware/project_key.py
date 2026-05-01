@@ -1,4 +1,4 @@
-"""Validate project key auth for POST /v1/chat/completions."""
+"""Project key + optional HMAC validation for ``POST /v1/chat/completions``."""
 
 import hashlib
 import hmac
@@ -46,6 +46,9 @@ def _hmac_signature(secret: str, project_key: str, payload: str) -> str:
 
 
 async def _notify_hmac_failure(*, project_key_id: int, project_key_name: str, reason: str, client_ip: str) -> None:
+    s = get_settings()
+    if not (s.teams_webhook_url or "").strip() or not s.teams_notify_hmac_failures:
+        return
     now = datetime.now(timezone.utc).isoformat()
     msg = (
         f"Security alert for project key **{project_key_name}** (id {project_key_id}). "
@@ -100,6 +103,10 @@ class ProjectKeyValidationMiddleware(BaseHTTPMiddleware):
         current = (get_client_ip(request) or "").strip()
 
         if settings.enable_hmac_check:
+            hmac_teams = bool(
+                (settings.teams_webhook_url or "").strip()
+                and settings.teams_notify_hmac_failures
+            )
             sig = (request.headers.get("x-signature") or "").strip().lower()
             ts_raw = (request.headers.get("x-timestamp") or "").strip()
             nonce = (request.headers.get("x-nonce") or "").strip()
@@ -114,7 +121,15 @@ class ProjectKeyValidationMiddleware(BaseHTTPMiddleware):
                     "proxy.hmac_missing",
                     outcome="denied",
                     request=request,
-                    extra={"http_status": 401, "project_key_id": row.id},
+                    extra={
+                        "http_status": 401,
+                        "project_key_id": row.id,
+                        **(
+                            {"teams_notification_sent": True}
+                            if hmac_teams
+                            else {}
+                        ),
+                    },
                 )
                 return JSONResponse(
                     status_code=401,
@@ -127,11 +142,25 @@ class ProjectKeyValidationMiddleware(BaseHTTPMiddleware):
 
             secret = (settings.hmac_signing_secret or "").strip()
             if not secret:
+                misconf_teams = hmac_teams
+                if misconf_teams:
+                    await post_teams_text(
+                        "**HMAC misconfigured:** `ENABLE_HMAC_CHECK` is true but `HMAC_SIGNING_SECRET` is empty. "
+                        f"Request hit key **{row.name}** (id {row.id}). Client IP: **{current or 'unknown'}**."
+                    )
                 log_audit(
                     "proxy.hmac_misconfigured",
                     outcome="denied",
                     request=request,
-                    extra={"http_status": 500, "project_key_id": row.id},
+                    extra={
+                        "http_status": 500,
+                        "project_key_id": row.id,
+                        **(
+                            {"teams_notification_sent": True}
+                            if misconf_teams
+                            else {}
+                        ),
+                    },
                 )
                 return JSONResponse(
                     status_code=500,
@@ -164,7 +193,15 @@ class ProjectKeyValidationMiddleware(BaseHTTPMiddleware):
                     "proxy.hmac_timestamp_invalid",
                     outcome="denied",
                     request=request,
-                    extra={"http_status": 401, "project_key_id": row.id},
+                    extra={
+                        "http_status": 401,
+                        "project_key_id": row.id,
+                        **(
+                            {"teams_notification_sent": True}
+                            if hmac_teams
+                            else {}
+                        ),
+                    },
                 )
                 return JSONResponse(
                     status_code=401,
@@ -200,7 +237,15 @@ class ProjectKeyValidationMiddleware(BaseHTTPMiddleware):
                     "proxy.hmac_signature_invalid",
                     outcome="denied",
                     request=request,
-                    extra={"http_status": 401, "project_key_id": row.id},
+                    extra={
+                        "http_status": 401,
+                        "project_key_id": row.id,
+                        **(
+                            {"teams_notification_sent": True}
+                            if hmac_teams
+                            else {}
+                        ),
+                    },
                 )
                 return JSONResponse(
                     status_code=401,
@@ -238,7 +283,15 @@ class ProjectKeyValidationMiddleware(BaseHTTPMiddleware):
                         "proxy.hmac_replay_blocked",
                         outcome="denied",
                         request=request,
-                        extra={"http_status": 401, "project_key_id": row.id},
+                        extra={
+                            "http_status": 401,
+                            "project_key_id": row.id,
+                            **(
+                                {"teams_notification_sent": True}
+                                if hmac_teams
+                                else {}
+                            ),
+                        },
                     )
                     return JSONResponse(
                         status_code=401,
@@ -268,7 +321,15 @@ class ProjectKeyValidationMiddleware(BaseHTTPMiddleware):
                         "proxy.hmac_replay_blocked",
                         outcome="denied",
                         request=request,
-                        extra={"http_status": 401, "project_key_id": row.id},
+                        extra={
+                            "http_status": 401,
+                            "project_key_id": row.id,
+                            **(
+                                {"teams_notification_sent": True}
+                                if hmac_teams
+                                else {}
+                            ),
+                        },
                     )
                     return JSONResponse(
                         status_code=401,

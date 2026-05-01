@@ -1,4 +1,4 @@
--- Add dashboard whitelist (run once on existing MSSQL DBs). Idempotent.
+
 IF OBJECT_ID(N'dbo.dashboard_users', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.dashboard_users (

@@ -34,6 +34,17 @@ class Settings(BaseSettings):
         alias="PRICING_JSON",
     )
     teams_webhook_url: str = Field(default="", alias="TEAMS_WEBHOOK_URL")
+    # True = POST Adaptive Card JSON (Power Automate "Post card"). False = {"text":"..."} (classic Incoming Webhook).
+    teams_use_adaptive_card: bool = Field(default=False, alias="TEAMS_USE_ADAPTIVE_CARD")
+    teams_adaptive_card_title: str = Field(
+        default="API Dashboard Alert",
+        alias="TEAMS_ADAPTIVE_CARD_TITLE",
+    )
+    teams_notify_budget_blocked: bool = Field(default=True, alias="TEAMS_NOTIFY_BUDGET_BLOCKED")
+    teams_notify_spike_blocked: bool = Field(default=True, alias="TEAMS_NOTIFY_SPIKE_BLOCKED")
+    teams_notify_budget_threshold: bool = Field(default=True, alias="TEAMS_NOTIFY_BUDGET_THRESHOLD")
+    teams_notify_hmac_failures: bool = Field(default=True, alias="TEAMS_NOTIFY_HMAC_FAILURES")
+    teams_notify_vk_reveal_failure: bool = Field(default=True, alias="TEAMS_NOTIFY_VK_REVEAL_FAILURE")
     spike_window_seconds: int = Field(default=60, alias="SPIKE_WINDOW_SECONDS")
     spike_max_cost_usd: float = Field(default=5.0, alias="SPIKE_MAX_COST_USD")
     spike_max_tokens: int = Field(default=500_000, alias="SPIKE_MAX_TOKENS")
@@ -49,9 +60,6 @@ class Settings(BaseSettings):
     dev_log_filename: str = Field(default="dev.log", alias="DEV_LOG_FILE")
     audit_log_filename: str = Field(default="audit.log", alias="AUDIT_LOG_FILE")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    log_encryption_key: str = Field(default="", alias="LOG_ENCRYPTION_KEY")
-    log_encrypt_audit: bool = Field(default=True, alias="LOG_ENCRYPT_AUDIT")
-    log_encrypt_dev: bool = Field(default=False, alias="LOG_ENCRYPT_DEV")
 
     @field_validator("database_url", mode="before")
     @classmethod

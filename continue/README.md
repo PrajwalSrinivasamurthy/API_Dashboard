@@ -6,7 +6,7 @@ The backend accepts your **project key** as **`Authorization: Bearer …`**, whi
 
 ## 0. Pre-flight (before Continue)
 
-1. **PostgreSQL** is running and `DATABASE_URL` in `backend/.env` is correct; schema applied (`backend/sql/schema.sql`).
+1. **Microsoft SQL Server** is reachable and `DATABASE_URL` in `backend/.env` is correct; schema applied (`backend/sql/schema.sql`).
 2. **`OPENAI_API_KEY`** is set in `backend/.env` ([OpenAI API keys](https://platform.openai.com/api-keys)).
 3. **Backend is up:** from `backend/`, `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
 4. Quick check: `curl -s http://127.0.0.1:8000/health` → `{"status":"ok"}`.
@@ -56,6 +56,6 @@ In the chat model dropdown, pick **“GPT-5 (project proxy)”** (or whatever `n
 
 - **`model`** must be an id your **OpenAI** key can call (e.g. `gpt-5`); the proxy forwards the request body to OpenAI.
 - For **`gpt-5`** with a **custom `apiBase`** (this proxy), add **`useResponsesApi: false`** on that model. Otherwise Continue calls **`/v1/responses`**, which this app does not implement — you get **`{"detail":"Not Found"}`**. See [Continue — OpenAI](https://docs.continue.dev/customize/model-providers/top-level/openai) (“Disable the Responses API”).
-- Use **`apiBase` without a trailing slash**, e.g. `http://127.0.0.1:8000/v1` (not `.../v1/`).
+- Use **`apiBase` without a trailing slash**, e.g. `http://127.0.0.1:8000/v1` (not `.../v1/`). If **`ENABLE_HMAC_CHECK`** is on, point at **`hmac-proxy`** instead (e.g. `http://127.0.0.1:8001/v1`) so Continue does not need to send HMAC headers.
 - The proxy uses a **non-stream** upstream call for stability, then may return an SSE-shaped response when clients request streaming; usage is logged from the upstream **`usage`** field.
 - Official OpenAI provider docs: [Continue — OpenAI](https://docs.continue.dev/customize/model-providers/top-level/openai).

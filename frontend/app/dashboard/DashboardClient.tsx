@@ -244,7 +244,7 @@ export function DashboardClient({
       <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-white">
-            Project LLM
+            API Dashboard 
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -1,4 +1,4 @@
-"""HTTP-level audit: admin routes and proxy denials (no bodies, no secrets)."""
+"""Audit middleware: logs each completed ``/admin/*`` HTTP call."""
 
 import time
 from typing import Callable
@@ -11,8 +11,6 @@ from app.services.audit_log import log_audit
 
 
 class AuditHttpMiddleware(BaseHTTPMiddleware):
-    """Logs completed ``/admin/*`` requests and denied ``/v1/chat/completions`` responses."""
-
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         start = time.perf_counter()
         response = await call_next(request)

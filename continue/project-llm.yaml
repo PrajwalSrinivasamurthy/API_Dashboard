@@ -1,4 +1,5 @@
-
+# Continue IDE model config (copy to .continue/config.yaml or merge as needed).
+# Use apiBase http://127.0.0.1:8000/v1 for the backend directly, or :8001/v1 for hmac-proxy when HMAC is enforced.
 name: Project LLM (local proxy)
 version: 1.0.0
 schema: v1
@@ -7,16 +8,10 @@ models:
   - name: GPT-5 (project proxy)
     provider: openai
     model: gpt-5
-    
     useResponsesApi: false
-    
-    apiBase: http://127.0.0.1:9000 #this is ddeployed service url
-    
+    apiBase: http://127.0.0.1:8001/v1
     apiKey: REPLACE_WITH_YOUR_SK_PROJ_KEY
     roles:
       - chat
       - edit
       - apply
-
-#this is just a placeholder file not a real file , 
-#maybe we can upload this to repo and deploy right now config.yaml is being used 

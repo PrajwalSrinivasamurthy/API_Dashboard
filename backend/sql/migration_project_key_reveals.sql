@@ -1,4 +1,4 @@
--- One-time virtual key reveal links (idempotent). Run on existing MSSQL DBs.
+
 IF OBJECT_ID(N'dbo.project_key_reveals', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.project_key_reveals (

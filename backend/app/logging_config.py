@@ -16,39 +16,7 @@ _AUDIT_LOG_BACKUPS = 10
 _configured = False
 
 
-def _load_log_fernet(settings):
-    raw = (settings.log_encryption_key or "").strip()
-    if not raw:
-        return None
-    from cryptography.fernet import Fernet
-
-    try:
-        return Fernet(raw.encode("utf-8"))
-    except Exception as e:
-        raise ValueError(
-            "Invalid LOG_ENCRYPTION_KEY: generate with "
-            'python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
-        ) from e
-
-
-def _build_rotating_handler(
-    path: Path,
-    *,
-    max_bytes: int,
-    backups: int,
-    fernet,
-    encrypt: bool,
-):
-    if fernet is not None and encrypt:
-        from app.fernet_rotating_file_handler import FernetRotatingFileHandler
-
-        return FernetRotatingFileHandler(
-            path,
-            maxBytes=max_bytes,
-            backupCount=backups,
-            encoding="utf-8",
-            fernet=fernet,
-        )
+def _build_rotating_handler(path: Path, *, max_bytes: int, backups: int) -> RotatingFileHandler:
     return RotatingFileHandler(
         path,
         maxBytes=max_bytes,
@@ -92,18 +60,10 @@ def configure_logging() -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    fernet = _load_log_fernet(settings)
-    if fernet is not None and not settings.log_encrypt_audit and not settings.log_encrypt_dev:
-        raise ValueError(
-            "LOG_ENCRYPTION_KEY is set but both LOG_ENCRYPT_AUDIT and LOG_ENCRYPT_DEV are false."
-        )
-
     dev_handler = _build_rotating_handler(
         dev_path,
         max_bytes=_DEV_LOG_MAX_BYTES,
         backups=_DEV_LOG_BACKUPS,
-        fernet=fernet,
-        encrypt=settings.log_encrypt_dev,
     )
     dev_handler.setLevel(_parse_level(settings.log_level))
     dev_handler.setFormatter(fmt)
@@ -112,8 +72,6 @@ def configure_logging() -> None:
         audit_path,
         max_bytes=_AUDIT_LOG_MAX_BYTES,
         backups=_AUDIT_LOG_BACKUPS,
-        fernet=fernet,
-        encrypt=settings.log_encrypt_audit,
     )
     audit_handler.setLevel(logging.INFO)
     audit_handler.setFormatter(logging.Formatter("%(message)s"))

@@ -11,19 +11,6 @@ Admin UI for **project keys** and **usage** (maps to `project_keys` and aggregat
 
 ## Setup
 
-### Docker local stack (recommended)
-
-From repo root:
-
-```bash
-cp .env.docker.example .env
-docker compose up --build
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-### Native setup
-
 ```bash
 cd frontend
 npm install
@@ -37,6 +24,8 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) — you are redirected to **`/login`**, then **`/dashboard`** after a successful sign-in. Whitelist emails in the backend **`dashboard_users`** table (e.g. **`POST /admin/dashboard-users`** with **`X-Admin-Key`**).
+
+From the repo root you can run **`npm run dev:frontend`** instead of `cd frontend` + `npm run dev`.
 
 ## Styling looks “broken” (plain white / Times font)
 

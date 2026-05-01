@@ -129,17 +129,28 @@ async def chat_completions(
                 detail=f"spent={spent_prior}; est_max={upper_cost}; cap={budget_cap}"[:2000],
             )
         )
+        budget_blocked_extra: dict = {
+            "http_status": 402,
+            "project_key_id": project_key_id,
+            "project_key_name": project_key.name,
+            "spent_usd": str(spent_prior),
+            "budget_cap_usd": str(budget_cap),
+        }
+        if (
+            (settings.teams_webhook_url or "").strip()
+            and settings.teams_notify_budget_blocked
+        ):
+            await post_teams_text(
+                f"**Budget cap blocked** a request for key **{project_key.name}** (id {project_key_id}).\n"
+                f"Approx spend before this request: **{spent_prior}** USD; cap: **{budget_cap}** USD.\n"
+                f"Client IP: **{client_ip or 'unknown'}**."
+            )
+            budget_blocked_extra["teams_notification_sent"] = True
         log_audit(
             "proxy.budget_blocked",
             outcome="denied",
             request=request,
-            extra={
-                "http_status": 402,
-                "project_key_id": project_key_id,
-                "project_key_name": project_key.name,
-                "spent_usd": str(spent_prior),
-                "budget_cap_usd": str(budget_cap),
-            },
+            extra=budget_blocked_extra,
         )
         return JSONResponse(
             status_code=402,
@@ -172,16 +183,28 @@ async def chat_completions(
                 detail=spike_detail[:2000],
             )
         )
+        spike_blocked_extra: dict = {
+            "http_status": 429,
+            "project_key_id": project_key_id,
+            "project_key_name": project_key.name,
+            "detail": spike_detail[:500] if spike_detail else None,
+        }
+        if (
+            (settings.teams_webhook_url or "").strip()
+            and settings.teams_notify_spike_blocked
+        ):
+            detail_short = (spike_detail or "")[:400]
+            await post_teams_text(
+                f"**Spike limit blocked** a request for key **{project_key.name}** (id {project_key_id}).\n"
+                f"Detail: {detail_short}\n"
+                f"Client IP: **{client_ip or 'unknown'}**."
+            )
+            spike_blocked_extra["teams_notification_sent"] = True
         log_audit(
             "proxy.spike_blocked",
             outcome="denied",
             request=request,
-            extra={
-                "http_status": 429,
-                "project_key_id": project_key_id,
-                "project_key_name": project_key.name,
-                "detail": spike_detail[:500] if spike_detail else None,
-            },
+            extra=spike_blocked_extra,
         )
         return JSONResponse(
             status_code=429,
@@ -251,21 +274,27 @@ async def chat_completions(
         )
         project_key.budget_warn_sent = True
         pct = float(settings.budget_threshold_fraction) * 100.0
-        await post_teams_text(
-            f"Budget threshold ({pct:.0f}%) reached for key **{project_key.name}** (id {project_key_id}): "
-            f"~{spent_after} USD spent of {budget_cap} USD cap."
-        )
+        threshold_extra: dict = {
+            "project_key_id": project_key_id,
+            "project_key_name": project_key.name,
+            "spent_usd": str(spent_after),
+            "threshold_usd": str(threshold_amt),
+            "budget_cap_usd": str(budget_cap),
+        }
+        if (
+            (settings.teams_webhook_url or "").strip()
+            and settings.teams_notify_budget_threshold
+        ):
+            await post_teams_text(
+                f"Budget threshold ({pct:.0f}%) reached for key **{project_key.name}** (id {project_key_id}): "
+                f"~{spent_after} USD spent of {budget_cap} USD cap."
+            )
+            threshold_extra["teams_notification_sent"] = True
         log_audit(
             "proxy.budget_threshold",
             outcome="warn",
             request=request,
-            extra={
-                "project_key_id": project_key_id,
-                "project_key_name": project_key.name,
-                "spent_usd": str(spent_after),
-                "threshold_usd": str(threshold_amt),
-                "budget_cap_usd": str(budget_cap),
-            },
+            extra=threshold_extra,
         )
 
     if requested_stream:

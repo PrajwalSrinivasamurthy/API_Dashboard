@@ -1,5 +1,3 @@
-"""Dashboard login and password change (whitelist in dashboard_users)."""
-
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status

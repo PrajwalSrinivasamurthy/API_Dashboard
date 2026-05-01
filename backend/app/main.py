@@ -1,5 +1,3 @@
-"""FastAPI application."""
-
 from contextlib import asynccontextmanager
 from pathlib import Path
 

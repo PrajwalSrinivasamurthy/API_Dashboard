@@ -1,6 +1,7 @@
 # Secrets & local env (never commit real keys)
 backend/.env
 frontend/.env.local
+hmac-proxy/.env
 .env
 .env.local
 .env.*
@@ -16,6 +17,7 @@ backend/logs/*.log.*
 # Python
 backend/.venv/
 backend/venv/
+hmac-proxy/.venv/
 .venv/
 venv/
 **/__pycache__/
@@ -34,6 +36,7 @@ htmlcov/
 
 # Node / Next.js
 frontend/node_modules/
+*.tsbuildinfo
 frontend/.next/
 frontend/out/
 .turbo/
