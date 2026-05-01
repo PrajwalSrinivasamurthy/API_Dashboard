@@ -1,17 +1,20 @@
 # Secrets & local env (never commit real keys)
 backend/.env
 frontend/.env.local
+hmac-proxy/.env
 .env
 .env.local
 .env.*
-!.env.example
-!backend/.env.example
-!frontend/.env.example
 *.pem
+
+# Backend log files (directory kept via logs/.gitkeep)
+backend/logs/*.log
+backend/logs/*.log.*
 
 # Python
 backend/.venv/
 backend/venv/
+hmac-proxy/.venv/
 .venv/
 venv/
 **/__pycache__/
@@ -30,6 +33,7 @@ htmlcov/
 
 # Node / Next.js
 frontend/node_modules/
+*.tsbuildinfo
 frontend/.next/
 frontend/out/
 .turbo/
@@ -43,14 +47,11 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
 
-# Continue IDE — local workspace config (not in repo; use continue/project-llm.yaml as template)
+# Continue IDE — local workspace config (not committed)
 .continue/
 
-
-README.md
-README1.md
-readme2.md
