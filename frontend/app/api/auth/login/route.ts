@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { DASHBOARD_TOKEN_COOKIE } from "@/lib/auth-cookie";
+import { sessionCookieSecure } from "@/lib/session-cookie";
 
 export async function POST(req: Request) {
   const base = process.env.BACKEND_URL?.trim().replace(/\/$/, "");
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecure(req),
     maxAge,
   });
   return res;
