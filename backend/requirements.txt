@@ -1,1 +1,20 @@
--r ../requirements.txt
+# HTTP API
+fastapi>=0.115.0,<1
+uvicorn[standard]>=0.32.0,<1
+gunicorn>=23.0.0,<25
+
+# PostgreSQL (async)
+sqlalchemy[asyncio]>=2.0.36,<3
+asyncpg>=0.30.0,<1
+
+# Upstream OpenAI-compatible HTTP
+httpx>=0.28.0,<1
+
+# Configuration
+python-dotenv>=1.0.1,<2
+pydantic>=2.7.0,<3
+pydantic-settings>=2.6.0,<3
+
+# Dashboard auth (whitelist login + JWT)
+bcrypt>=4.2.0,<5
+PyJWT>=2.9.0,<3

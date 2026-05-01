@@ -35,16 +35,13 @@ export async function POST(req: Request) {
   if (!data.access_token) {
     return NextResponse.json({ detail: "Bad response from server" }, { status: 502 });
   }
-  const jwtHours = Number(process.env.JWT_EXPIRE_HOURS?.trim() || "5");
-  const maxAge = Math.max(300, Math.round((Number.isFinite(jwtHours) ? jwtHours : 5) * 3600));
-
   const res = NextResponse.json({ ok: true });
   res.cookies.set(DASHBOARD_TOKEN_COOKIE, data.access_token, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
     secure: process.env.NODE_ENV === "production",
-    maxAge,
+    maxAge: 60 * 60 * 24 * 7,
   });
   return res;
 }
