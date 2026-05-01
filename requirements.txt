@@ -1,0 +1,36 @@
+# API_Dashboard — Python dependencies (FastAPI backend + optional hmac-proxy).
+#
+# From repo root (recommended):
+#   python -m venv .venv
+#   .\.venv\Scripts\activate          # Windows
+#   # source .venv/bin/activate        # Linux/macOS
+#   python -m pip install -U pip
+#   pip install -r requirements.txt
+#
+# Frontend is Node-based (install separately):
+#   cd frontend && npm ci && npm run build
+#
+# SQL Server: install Microsoft ODBC Driver 18 for SQL Server on the host
+# (pyodbc/aioodbc use the system driver; not installed via pip).
+
+# HTTP API
+fastapi>=0.115.0,<1
+uvicorn[standard]>=0.32.0,<1
+gunicorn>=23.0.0,<25
+
+# Microsoft SQL Server (async via ODBC)
+sqlalchemy[asyncio]>=2.0.36,<3
+aioodbc>=0.5.0,<1
+pyodbc>=5.1.0,<6
+
+# Upstream OpenAI-compatible HTTP
+httpx>=0.28.0,<1
+
+# Configuration
+python-dotenv>=1.0.1,<2
+pydantic>=2.7.0,<3
+pydantic-settings>=2.6.0,<3
+
+# Dashboard auth (whitelist login + JWT)
+bcrypt>=4.2.0,<5
+PyJWT>=2.9.0,<3

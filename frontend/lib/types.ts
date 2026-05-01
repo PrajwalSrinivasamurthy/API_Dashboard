@@ -6,6 +6,10 @@ export type ProjectKeyRow = {
   active: boolean;
   used_tokens: number;
   created_at: string;
+  allowed_client_ip?: string | null;
+  /** API may send JSON numbers or stringified decimals */
+  budget_usd: string | number;
+  spent_usd: string | number;
 };
 
 export type UsagePerProject = {
@@ -24,8 +28,11 @@ export type AdminUsage = {
 
 export type CreateKeyResponse = {
   id: number;
-  key: string;
   name: string;
   active: boolean;
+  reveal_token: string;
+  reveal_expires_at: string;
   message?: string;
+  /** Set client-side after create; full URL to share */
+  revealUrl?: string;
 };

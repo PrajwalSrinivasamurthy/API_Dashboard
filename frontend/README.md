@@ -14,16 +14,17 @@ Admin UI for **project keys** and **usage** (maps to `project_keys` and aggregat
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local
 ```
 
-Edit **`.env.local`**: `BACKEND_URL`, `ADMIN_API_KEY`, **`JWT_SECRET`** (same value as backend `JWT_SECRET`).
+Create **`frontend/.env.local`** with at least: `BACKEND_URL`, `ADMIN_API_KEY`, **`JWT_SECRET`** (same value as backend `JWT_SECRET`), and optionally **`JWT_EXPIRE_HOURS`** (default **5**, must match backend for login cookie lifetime).
 
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) — you are redirected to **`/login`**, then **`/dashboard`** after a successful sign-in. Whitelist emails in the backend **`dashboard_users`** table (e.g. **`POST /admin/dashboard-users`** with **`X-Admin-Key`**).
+
+From the repo root you can run **`npm run dev:frontend`** instead of `cd frontend` + `npm run dev`.
 
 ## Styling looks “broken” (plain white / Times font)
 
@@ -38,7 +39,7 @@ Open [http://localhost:3000](http://localhost:3000) — you are redirected to **
 |-----|---------|
 | **Usage overview** | `GET /admin/usage` — totals + per-project table |
 | **Project keys** | `GET /admin/project-keys` — table + disable → `POST /admin/disable-key` |
-| **New key** | `POST /admin/create-key` — shows full key once |
+| **Virtual key** | `POST /admin/create-key` — returns a **one-time share link** (`/vk/…`); recipient opens it once to copy the key |
 
 ## Production
 

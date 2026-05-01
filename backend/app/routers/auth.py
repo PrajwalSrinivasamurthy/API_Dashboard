@@ -1,8 +1,6 @@
-"""Dashboard login and password change (whitelist in dashboard_users)."""
-
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +12,7 @@ from app.schemas import (
     DashboardLoginRequest,
     DashboardTokenResponse,
 )
+from app.services.audit_log import log_audit
 from app.services.dashboard_jwt import create_dashboard_token, decode_dashboard_token
 from app.services.passwords import hash_password, verify_password
 
@@ -26,16 +25,34 @@ def _normalize_email(raw: str) -> str:
 
 
 @router.post("/login", response_model=DashboardTokenResponse)
-async def login(body: DashboardLoginRequest, session: Annotated[AsyncSession, Depends(get_db)]):
+async def login(
+    request: Request,
+    body: DashboardLoginRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
     email = _normalize_email(body.email)
     result = await session.execute(select(DashboardUser).where(DashboardUser.email == email))
     row = result.scalar_one_or_none()
     if row is None or not verify_password(body.password, row.password_hash):
+        log_audit(
+            "dashboard.login",
+            outcome="denied",
+            actor=email,
+            request=request,
+            extra={"http_status": 401},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
     token = create_dashboard_token(email)
+    log_audit(
+        "dashboard.login",
+        outcome="ok",
+        actor=email,
+        request=request,
+        extra={"http_status": 200},
+    )
     return DashboardTokenResponse(access_token=token)
 
 
@@ -58,6 +75,7 @@ async def _dashboard_email_from_bearer(
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(
+    request: Request,
     body: DashboardChangePasswordRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
     email: Annotated[str, Depends(_dashboard_email_from_bearer)],
@@ -67,6 +85,20 @@ async def change_password(
     if row is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     if not verify_password(body.old_password, row.password_hash):
+        log_audit(
+            "dashboard.change_password",
+            outcome="denied",
+            actor=email,
+            request=request,
+            extra={"http_status": 400, "reason": "old_password_mismatch"},
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     row.password_hash = hash_password(body.new_password)
+    log_audit(
+        "dashboard.change_password",
+        outcome="ok",
+        actor=email,
+        request=request,
+        extra={"http_status": 204},
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

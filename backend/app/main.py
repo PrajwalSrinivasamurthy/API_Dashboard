@@ -1,5 +1,3 @@
-"""FastAPI application."""
-
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,6 +6,10 @@ from dotenv import load_dotenv
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(_BACKEND_DIR / ".env")
 
+from app.logging_config import configure_logging
+
+configure_logging()
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,8 +17,9 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.database import engine
+from app.middleware.audit_http import AuditHttpMiddleware
 from app.middleware.project_key import ProjectKeyValidationMiddleware
-from app.routers import admin, auth, proxy
+from app.routers import admin, auth, proxy, reveal
 
 
 def _cors():
@@ -49,10 +52,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(ProjectKeyValidationMiddleware)
+app.add_middleware(AuditHttpMiddleware)
 
 app.include_router(proxy.router, prefix="/v1")
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(reveal.router)
 
 
 @app.get("/health")
