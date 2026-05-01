@@ -70,7 +70,7 @@ class Settings(BaseSettings):
         if s.startswith("postgresql://") or s.startswith("postgresql+asyncpg://"):
             raise ValueError(
                 "DATABASE_URL must use Microsoft SQL Server. "
-                "Use mssql+aioodbc://... (see backend/.env.example)."
+                "Use mssql+aioodbc://... with driver= in the query string."
             )
         if s.startswith("mssql://"):
             return s.replace("mssql://", "mssql+aioodbc://", 1)

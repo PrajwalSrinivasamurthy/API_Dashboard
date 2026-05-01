@@ -14,10 +14,9 @@ Admin UI for **project keys** and **usage** (maps to `project_keys` and aggregat
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local
 ```
 
-Edit **`.env.local`**: `BACKEND_URL`, `ADMIN_API_KEY`, **`JWT_SECRET`** (same value as backend `JWT_SECRET`), and optionally **`JWT_EXPIRE_HOURS`** (default **5**, must match backend for login cookie lifetime).
+Create **`frontend/.env.local`** with at least: `BACKEND_URL`, `ADMIN_API_KEY`, **`JWT_SECRET`** (same value as backend `JWT_SECRET`), and optionally **`JWT_EXPIRE_HOURS`** (default **5**, must match backend for login cookie lifetime).
 
 ```bash
 npm run dev

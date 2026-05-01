@@ -5,9 +5,6 @@ hmac-proxy/.env
 .env
 .env.local
 .env.*
-!.env.example
-!backend/.env.example
-!frontend/.env.example
 *.pem
 
 # Backend log files (directory kept via logs/.gitkeep)
@@ -55,6 +52,6 @@ Thumbs.db
 *.swo
 *~
 
-# Continue IDE — local workspace config (not in repo; use continue/project-llm.yaml as template)
+# Continue IDE — local workspace config (not committed)
 .continue/
 
