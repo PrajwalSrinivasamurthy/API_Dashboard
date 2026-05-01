@@ -1,5 +1,3 @@
-"""Dependencies."""
-
 from typing import Optional
 
 from fastapi import Header, HTTPException, Request, status
