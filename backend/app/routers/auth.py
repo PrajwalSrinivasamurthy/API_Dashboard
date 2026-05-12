@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -18,6 +19,7 @@ from app.services.passwords import hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 _bearer = HTTPBearer(auto_error=False)
+logger = logging.getLogger("app.auth")
 
 
 def _normalize_email(raw: str) -> str:
@@ -34,6 +36,7 @@ async def login(
     result = await session.execute(select(DashboardUser).where(DashboardUser.email == email))
     row = result.scalar_one_or_none()
     if row is None or not verify_password(body.password, row.password_hash):
+        logger.warning("Dashboard login denied for email=%s", email)
         log_audit(
             "dashboard.login",
             outcome="denied",
@@ -46,6 +49,7 @@ async def login(
             detail="Invalid email or password",
         )
     token = create_dashboard_token(email)
+    logger.info("Dashboard login successful for email=%s", email)
     log_audit(
         "dashboard.login",
         outcome="ok",
@@ -85,6 +89,7 @@ async def change_password(
     if row is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     if not verify_password(body.old_password, row.password_hash):
+        logger.warning("Dashboard password change denied for email=%s", email)
         log_audit(
             "dashboard.change_password",
             outcome="denied",
@@ -94,6 +99,7 @@ async def change_password(
         )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     row.password_hash = hash_password(body.new_password)
+    logger.info("Dashboard password changed for email=%s", email)
     log_audit(
         "dashboard.change_password",
         outcome="ok",

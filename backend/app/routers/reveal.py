@@ -129,8 +129,6 @@ async def reveal_virtual_key(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     reveal.consumed_at = now
     client_ip = get_client_ip(request)
-    if client_ip:
-        pk.allowed_client_ip = client_ip
     log_audit(
         "vk.reveal",
         outcome="ok",
@@ -140,7 +138,7 @@ async def reveal_virtual_key(
             "http_status": 200,
             "project_key_id": pk.id,
             "project_key_name": pk.name,
-            "bound_client_ip": client_ip,
+            "reveal_client_ip": client_ip,
         },
     )
     return RevealVirtualKeyResponse(key=pk.key)

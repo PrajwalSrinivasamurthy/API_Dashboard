@@ -6,7 +6,6 @@ export type ProjectKeyRow = {
   active: boolean;
   used_tokens: number;
   created_at: string;
-  allowed_client_ip?: string | null;
   /** API may send JSON numbers or stringified decimals */
   budget_usd: string | number;
   spent_usd: string | number;

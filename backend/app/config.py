@@ -50,7 +50,6 @@ class Settings(BaseSettings):
     spike_max_tokens: int = Field(default=500_000, alias="SPIKE_MAX_TOKENS")
     spike_max_requests: int = Field(default=120, alias="SPIKE_MAX_REQUESTS")
     budget_threshold_fraction: float = Field(default=0.8, alias="BUDGET_THRESHOLD_FRACTION")
-    enable_ip_check: bool = Field(default=False, alias="ENABLE_IP_CHECK")
     enable_hmac_check: bool = Field(default=True, alias="ENABLE_HMAC_CHECK")
     hmac_signing_secret: str = Field(default="", alias="HMAC_SIGNING_SECRET")
     hmac_max_skew_seconds: int = Field(default=300, alias="HMAC_MAX_SKEW_SECONDS")
@@ -59,6 +58,7 @@ class Settings(BaseSettings):
     log_dir: str = Field(default="logs", alias="LOG_DIR")
     dev_log_filename: str = Field(default="dev.log", alias="DEV_LOG_FILE")
     audit_log_filename: str = Field(default="audit.log", alias="AUDIT_LOG_FILE")
+    timing_log_filename: str = Field(default="request_timing.log", alias="TIMING_LOG_FILE")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
     @field_validator("database_url", mode="before")

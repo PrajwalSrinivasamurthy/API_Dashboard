@@ -35,7 +35,6 @@ class ProjectKeyAdminItem(BaseModel):
     active: bool
     used_tokens: int
     created_at: datetime
-    allowed_client_ip: Optional[str] = None
     budget_usd: Decimal
     spent_usd: Decimal
 

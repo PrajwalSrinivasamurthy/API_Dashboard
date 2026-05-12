@@ -11,7 +11,6 @@ BEGIN
         id                  INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [key]               NVARCHAR(255) NOT NULL,
         [name]              NVARCHAR(255) NOT NULL,
-        allowed_client_ip   NVARCHAR(45) NULL,
         budget_usd          DECIMAL(12, 2) NOT NULL CONSTRAINT DF_project_keys_budget DEFAULT (25.00),
         budget_warn_sent    BIT NOT NULL CONSTRAINT DF_project_keys_budget_warn DEFAULT (0),
         active              BIT NOT NULL CONSTRAINT DF_project_keys_active DEFAULT (1),
