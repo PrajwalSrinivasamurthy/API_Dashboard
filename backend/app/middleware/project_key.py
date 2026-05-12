@@ -1,4 +1,4 @@
-"""Project key + optional HMAC validation for ``POST /v1/chat/completions``."""
+"""Project key and HMAC validation for ``POST /v1/chat/completions``."""
 
 import hashlib
 import hmac
@@ -335,49 +335,6 @@ class ProjectKeyValidationMiddleware(BaseHTTPMiddleware):
                         status_code=401,
                         content={"error": {"message": "Replay detected (nonce already used)"}},
                     )
-
-        bound = (row.allowed_client_ip or "").strip()
-        if settings.enable_ip_check and bound:
-            current = (get_client_ip(request) or "").strip()
-            if not current or current != bound:
-                now = datetime.now(timezone.utc)
-                detail = f"expected_ip={bound}; client_ip={current or 'none'}"
-                async with async_session_factory() as sec_session:
-                    sec_session.add(
-                        ProjectKeySecurityEvent(
-                            project_key_id=row.id,
-                            event_type="ip_mismatch",
-                            client_ip=current or None,
-                            detail=detail[:2000],
-                        )
-                    )
-                    await sec_session.commit()
-                msg = (
-                    f"Unidentified login for key **{row.name}** at {now.isoformat()} "
-                    f"from IP **{current or 'unknown'}** (expected **{bound}**)."
-                )
-                await post_teams_text(msg)
-                log_audit(
-                    "proxy.ip_mismatch",
-                    outcome="denied",
-                    request=request,
-                    extra={
-                        "http_status": 403,
-                        "project_key_id": row.id,
-                        "project_key_name": row.name,
-                        "client_ip_observed": current or None,
-                        "allowed_client_ip": bound,
-                    },
-                )
-                return JSONResponse(
-                    status_code=403,
-                    content={
-                        "error": {
-                            "message": "This project key is bound to another IP address. "
-                            "Use the same network as when you opened the reveal link.",
-                        }
-                    },
-                )
 
         request.state.project_key_id = row.id
         request.state.project_key_name = row.name

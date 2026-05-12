@@ -67,7 +67,6 @@ async def list_project_keys(session: Annotated[AsyncSession, Depends(get_db)]):
             active=r.active,
             used_tokens=int(r.used_tokens or 0),
             created_at=r.created_at,
-            allowed_client_ip=r.allowed_client_ip,
             budget_usd=Decimal(str(r.budget_usd or 0)).quantize(Decimal("0.01")),
             spent_usd=spent_map.get(r.id, Decimal("0")),
         )

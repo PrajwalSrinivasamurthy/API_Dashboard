@@ -415,10 +415,7 @@ export function DashboardClient({
                 />
               </div>
               <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-                <h2 className="border-b border-[var(--border)] px-4 py-3 text-sm font-medium text-white">
-                  Per project (from <code className="text-xs">usage_logs</code>{" "}
-                  + <code className="text-xs">project_keys</code>)
-                </h2>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
@@ -478,7 +475,7 @@ export function DashboardClient({
         <section>
           <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
             <h2 className="border-b border-[var(--border)] px-4 py-3 text-sm font-medium text-white">
-              <code className="text-xs">project_keys</code> table
+              Project keys
             </h2>
             {keys === null && loading ? (
               <p className="px-4 py-8 text-[var(--muted)]">Loading…</p>
@@ -492,7 +489,6 @@ export function DashboardClient({
                       <th className="px-4 py-3 font-medium">Active</th>
                       <th className="px-4 py-3 font-medium">Used tokens</th>
                       <th className="px-4 py-3 font-medium">Created</th>
-                      <th className="px-4 py-3 font-medium">Bound IP</th>
                       <th className="px-4 py-3 font-medium">Budget</th>
                       <th className="px-4 py-3 font-medium">Spent</th>
                       <th className="px-4 py-3 font-medium">Actions</th>
@@ -524,9 +520,6 @@ export function DashboardClient({
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           {fmtDate(k.created_at)}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-[var(--muted)]">
-                          {k.allowed_client_ip ?? "—"}
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           {fmtUsd(k.budget_usd)}

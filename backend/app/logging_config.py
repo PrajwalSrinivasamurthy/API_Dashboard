@@ -12,6 +12,8 @@ _DEV_LOG_MAX_BYTES = 10 * 1024 * 1024
 _DEV_LOG_BACKUPS = 5
 _AUDIT_LOG_MAX_BYTES = 10 * 1024 * 1024
 _AUDIT_LOG_BACKUPS = 10
+_TIMING_LOG_MAX_BYTES = 10 * 1024 * 1024
+_TIMING_LOG_BACKUPS = 10
 
 _configured = False
 
@@ -54,6 +56,7 @@ def configure_logging() -> None:
 
     dev_path = log_root / settings.dev_log_filename
     audit_path = log_root / settings.audit_log_filename
+    timing_path = log_root / settings.timing_log_filename
 
     fmt = logging.Formatter(
         "%(asctime)s %(levelname)s [%(name)s] %(message)s",
@@ -76,6 +79,19 @@ def configure_logging() -> None:
     audit_handler.setLevel(logging.INFO)
     audit_handler.setFormatter(logging.Formatter("%(message)s"))
 
+    timing_handler = _build_rotating_handler(
+        timing_path,
+        max_bytes=_TIMING_LOG_MAX_BYTES,
+        backups=_TIMING_LOG_BACKUPS,
+    )
+    timing_handler.setLevel(logging.INFO)
+    timing_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+
     console = logging.StreamHandler(sys.stdout)
     console.setLevel(_parse_level(settings.log_level))
     console.setFormatter(fmt)
@@ -92,6 +108,12 @@ def configure_logging() -> None:
     audit_logger.setLevel(logging.INFO)
     audit_logger.addHandler(audit_handler)
     audit_logger.propagate = False
+
+    timing_logger = logging.getLogger("app.timing")
+    timing_logger.handlers.clear()
+    timing_logger.setLevel(logging.INFO)
+    timing_logger.addHandler(timing_handler)
+    timing_logger.propagate = False
 
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -116,3 +138,8 @@ def _console_only() -> None:
     audit_logger.setLevel(logging.INFO)
     audit_logger.addHandler(console)
     audit_logger.propagate = False
+    timing_logger = logging.getLogger("app.timing")
+    timing_logger.handlers.clear()
+    timing_logger.setLevel(logging.INFO)
+    timing_logger.addHandler(console)
+    timing_logger.propagate = False
