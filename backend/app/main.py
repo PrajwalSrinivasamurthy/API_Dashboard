@@ -19,6 +19,7 @@ from app.config import get_settings
 from app.database import engine
 from app.middleware.audit_http import AuditHttpMiddleware
 from app.middleware.project_key import ProjectKeyValidationMiddleware
+from app.middleware.request_timing import RequestTimingMiddleware
 from app.routers import admin, auth, proxy, reveal
 
 
@@ -53,6 +54,7 @@ app.add_middleware(
 )
 app.add_middleware(ProjectKeyValidationMiddleware)
 app.add_middleware(AuditHttpMiddleware)
+app.add_middleware(RequestTimingMiddleware)
 
 app.include_router(proxy.router, prefix="/v1")
 app.include_router(auth.router)
