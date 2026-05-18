@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -128,9 +129,19 @@ class DashboardUser(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    project: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    permissions: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    token_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("1")
+    )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True),
+        server_default=text("SYSUTCDATETIME()"),
+        nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True),
+        server_default=text("SYSUTCDATETIME()"),
+        server_onupdate=text("SYSUTCDATETIME()"),
+        nullable=False,
     )

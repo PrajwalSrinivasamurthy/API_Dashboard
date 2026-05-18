@@ -3,22 +3,24 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict
+from urllib.parse import quote_plus
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
-_ENV_FILE = _BACKEND_DIR / ".env"
+_ENV_FILES = (_BACKEND_DIR / ".env", _BACKEND_DIR.parent / ".env")
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=_ENV_FILE,
+        env_file=_ENV_FILES,
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    database_url: str = Field(..., alias="DATABASE_URL")
+    database_url: str = Field(default="", alias="DATABASE_URL")
+    mssql_conn: str = Field(default="", alias="MSSQL_CONN")
     openai_api_key: str = Field(..., alias="OPENAI_API_KEY")
     openai_base_url: str = Field(
         "https://api.openai.com/v1",
@@ -60,6 +62,23 @@ class Settings(BaseSettings):
     audit_log_filename: str = Field(default="audit.log", alias="AUDIT_LOG_FILE")
     timing_log_filename: str = Field(default="request_timing.log", alias="TIMING_LOG_FILE")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    @model_validator(mode="before")
+    @classmethod
+    def database_url_from_mssql_conn(cls, data: Any) -> Any:
+        """If MSSQL_CONN is set (ODBC string), build DATABASE_URL for aioodbc."""
+        if not isinstance(data, dict):
+            return data
+        odbc = (data.get("MSSQL_CONN") or data.get("mssql_conn") or "").strip()
+        if odbc:
+            data["DATABASE_URL"] = f"mssql+aioodbc:///?odbc_connect={quote_plus(odbc)}"
+        return data
+
+    @model_validator(mode="after")
+    def require_database_url(self) -> "Settings":
+        if not (self.database_url or "").strip():
+            raise ValueError("Set DATABASE_URL or MSSQL_CONN in .env")
+        return self
 
     @field_validator("database_url", mode="before")
     @classmethod
