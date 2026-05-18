@@ -2,10 +2,12 @@ import json
 import secrets
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Annotated, List
+from typing import Annotated, List, Type, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -27,6 +29,18 @@ from app.schemas import (
 from app.services.passwords import hash_password
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+
+T = TypeVar("T", bound=BaseModel)
+
+
+def _parse_body(model: Type[T], payload: dict) -> T:
+    try:
+        return model.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(),
+        ) from exc
 
 
 def _new_key() -> str:
@@ -172,6 +186,9 @@ async def list_dashboard_users(session: Annotated[AsyncSession, Depends(get_db)]
         DashboardUserListItem(
             id=r.id,
             email=r.email,
+            project=r.project,
+            permissions=r.permissions,
+            token_version=int(r.token_version or 1),
             created_at=r.created_at,
             updated_at=r.updated_at,
         )
@@ -185,16 +202,33 @@ async def create_dashboard_user(
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     payload = await _json_object_body(request)
-    body = CreateDashboardUserRequest.model_validate(payload)
+    body = _parse_body(CreateDashboardUserRequest, payload)
     email = body.email.strip().lower()
     existing = await session.execute(select(DashboardUser).where(DashboardUser.email == email))
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=409, detail="Email already whitelisted")
-    row = DashboardUser(email=email, password_hash=hash_password(body.password))
+    project = (body.project or "").strip() or None
+    permissions = body.permissions.strip() if body.permissions else None
+    row = DashboardUser(
+        email=email,
+        password_hash=hash_password(body.password),
+        project=project,
+        permissions=permissions,
+    )
     session.add(row)
-    await session.flush()
-    await session.refresh(row)
-    return {"id": row.id, "email": row.email}
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        if "dashboard_users" in str(exc).lower():
+            raise HTTPException(status_code=409, detail="Email already whitelisted") from exc
+        raise
+    return {
+        "id": row.id,
+        "email": row.email,
+        "project": row.project,
+        "permissions": row.permissions,
+        "token_version": int(row.token_version or 1),
+    }
 
 
 @router.post("/delete-dashboard-user", status_code=status.HTTP_204_NO_CONTENT)
@@ -203,7 +237,7 @@ async def delete_dashboard_user(
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     payload = await _json_object_body(request)
-    body = DeleteDashboardUserRequest.model_validate(payload)
+    body = _parse_body(DeleteDashboardUserRequest, payload)
     if body.id is not None:
         q = select(DashboardUser).where(DashboardUser.id == body.id)
     else:
@@ -222,7 +256,7 @@ async def update_dashboard_user_password(
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     payload = await _json_object_body(request)
-    body = AdminUpdateDashboardUserPasswordRequest.model_validate(payload)
+    body = _parse_body(AdminUpdateDashboardUserPasswordRequest, payload)
     if body.id is not None:
         q = select(DashboardUser).where(DashboardUser.id == body.id)
     else:
