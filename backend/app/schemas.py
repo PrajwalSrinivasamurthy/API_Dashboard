@@ -75,6 +75,8 @@ class DashboardChangePasswordRequest(BaseModel):
 class CreateDashboardUserRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=255)
     password: str = Field(default="password", min_length=1, max_length=72)
+    project: str = Field(default="", max_length=255)
+    permissions: Optional[str] = Field(default=None, max_length=255)
 
 
 class DashboardUserListItem(BaseModel):
@@ -82,6 +84,9 @@ class DashboardUserListItem(BaseModel):
 
     id: int
     email: str
+    project: Optional[str] = None
+    permissions: Optional[str] = None
+    token_version: int
     created_at: datetime
     updated_at: datetime
 

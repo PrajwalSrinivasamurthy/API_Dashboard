@@ -1,22 +1,18 @@
-# Secrets & local env (never commit real keys)
+# Secrets (never commit)
+.env
+.env.local
 backend/.env
 frontend/.env.local
 hmac-proxy/.env
-.env
-.env.local
-.env.*
-*.pem
-
-# Backend log files (directory kept via logs/.gitkeep)
-backend/logs/*.log
-backend/logs/*.log.*
+!.env.example
+!**/.env.example
 
 # Python
+.venv/
+venv/
 backend/.venv/
 backend/venv/
 hmac-proxy/.venv/
-.venv/
-venv/
 **/__pycache__/
 *.py[cod]
 *.pyo
@@ -31,11 +27,15 @@ build/
 .coverage
 htmlcov/
 
+# Backend logs (keep directory via .gitkeep)
+backend/logs/*.log
+backend/logs/*.log.*
+
 # Node / Next.js
 frontend/node_modules/
-*.tsbuildinfo
 frontend/.next/
 frontend/out/
+*.tsbuildinfo
 .turbo/
 .vercel/
 npm-debug.log*
@@ -43,15 +43,17 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# OS / editor
+# Local dev / IDE (not needed on server)
+bruno/
+.continue/
+.cursor/
+.vscode/
+.idea/
+backend/scripts/
+
+# OS
 .DS_Store
 Thumbs.db
-.idea/
-.vscode/
 *.swp
 *.swo
 *~
-
-# Continue IDE — local workspace config (not committed)
-.continue/
-

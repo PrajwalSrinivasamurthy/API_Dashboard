@@ -20,3 +20,24 @@ IF NOT EXISTS (
 )
     CREATE NONCLUSTERED INDEX idx_dashboard_users_email ON dbo.dashboard_users (email);
 GO
+
+IF COL_LENGTH('dbo.dashboard_users', 'project') IS NULL
+BEGIN
+    ALTER TABLE dbo.dashboard_users
+    ADD project NVARCHAR(255) NOT NULL CONSTRAINT DF_dashboard_users_project DEFAULT ('');
+END
+GO
+
+IF COL_LENGTH('dbo.dashboard_users', 'permissions') IS NULL
+BEGIN
+    ALTER TABLE dbo.dashboard_users
+    ADD permissions NVARCHAR(255) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.dashboard_users', 'token_version') IS NULL
+BEGIN
+    ALTER TABLE dbo.dashboard_users
+    ADD token_version INT NOT NULL CONSTRAINT DF_dashboard_users_token_version DEFAULT (1);
+END
+GO
