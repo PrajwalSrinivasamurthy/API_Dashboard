@@ -112,3 +112,8 @@ class AdminUpdateDashboardUserPasswordRequest(BaseModel):
         if self.id is None and (self.email is None or not str(self.email).strip()):
             raise ValueError("Provide id or email")
         return self
+
+
+class UpdateKeyBudgetRequest(BaseModel):
+    id: int
+    budget_usd: Decimal = Field(..., ge=Decimal("0"), le=Decimal("999999.99"))

@@ -24,6 +24,7 @@ from app.schemas import (
     DeleteDashboardUserRequest,
     DisableKeyRequest,
     ProjectKeyAdminItem,
+    UpdateKeyBudgetRequest,
     UsagePerProject,
 )
 from app.services.passwords import hash_password
@@ -133,6 +134,20 @@ async def disable_key(
     if row is None:
         raise HTTPException(status_code=404, detail="Project key not found")
     row.active = False
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/update-key-budget", status_code=status.HTTP_204_NO_CONTENT)
+async def update_key_budget(
+    body: UpdateKeyBudgetRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await session.execute(select(ProjectKey).where(ProjectKey.id == body.id))
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Project key not found")
+    row.budget_usd = body.budget_usd
+    row.budget_warn_sent = False  # reset warning so it fires again at new threshold
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
