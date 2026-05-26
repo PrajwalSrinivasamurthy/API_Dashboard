@@ -61,6 +61,10 @@ export function DashboardClient({
   const [creating, setCreating] = useState(false);
   const [createdKey, setCreatedKey] = useState<CreateKeyResponse | null>(null);
 
+  // Budget editing state: keyed by project key id
+  const [budgetEdit, setBudgetEdit] = useState<Record<number, string>>({});
+  const [budgetSaving, setBudgetSaving] = useState<Record<number, boolean>>({});
+
   const [showPassword, setShowPassword] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -160,6 +164,52 @@ export function DashboardClient({
       return;
     }
     await refreshAll();
+  }
+
+  function startBudgetEdit(id: number, currentBudget: string | number) {
+    const val = typeof currentBudget === "number"
+      ? currentBudget.toFixed(2)
+      : parseFloat(String(currentBudget)).toFixed(2);
+    setBudgetEdit((prev) => ({ ...prev, [id]: val }));
+  }
+
+  function cancelBudgetEdit(id: number) {
+    setBudgetEdit((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
+  async function saveBudget(id: number, name: string) {
+    const raw = budgetEdit[id];
+    const value = parseFloat(raw);
+    if (isNaN(value) || value < 0) {
+      setError("Budget must be a valid number ≥ 0.");
+      return;
+    }
+    setBudgetSaving((prev) => ({ ...prev, [id]: true }));
+    setError(null);
+    try {
+      const r = await fetch("/api/admin/update-key-budget", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, budget_usd: parseFloat(value.toFixed(2)) }),
+      });
+      if (!r.ok && r.status !== 204) {
+        const j = await parseJson<{ detail?: string }>(r);
+        setError(j?.detail ?? `Update failed (${r.status})`);
+        return;
+      }
+      cancelBudgetEdit(id);
+      await loadKeys();
+    } finally {
+      setBudgetSaving((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
   }
 
   async function copyText(text: string) {
@@ -521,8 +571,54 @@ export function DashboardClient({
                         <td className="px-4 py-3 text-[var(--muted)]">
                           {fmtDate(k.created_at)}
                         </td>
-                        <td className="px-4 py-3 text-[var(--muted)]">
-                          {fmtUsd(k.budget_usd)}
+                        <td className="px-4 py-3">
+                          {budgetEdit[k.id] !== undefined ? (
+                            <span className="flex items-center gap-1">
+                              <span className="text-[var(--muted)] text-xs">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={budgetEdit[k.id]}
+                                onChange={(e) =>
+                                  setBudgetEdit((prev) => ({ ...prev, [k.id]: e.target.value }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") void saveBudget(k.id, k.name);
+                                  if (e.key === "Escape") cancelBudgetEdit(k.id);
+                                }}
+                                className="w-24 rounded border border-[var(--accent)] bg-[var(--bg)] px-2 py-0.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                disabled={budgetSaving[k.id]}
+                                onClick={() => void saveBudget(k.id, k.name)}
+                                className="rounded px-2 py-0.5 text-xs font-medium text-[var(--success)] hover:bg-white/5 disabled:opacity-50"
+                              >
+                                {budgetSaving[k.id] ? "…" : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => cancelBudgetEdit(k.id)}
+                                className="rounded px-2 py-0.5 text-xs font-medium text-[var(--muted)] hover:bg-white/5"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-2">
+                              <span className="text-[var(--muted)]">{fmtUsd(k.budget_usd)}</span>
+                              <button
+                                type="button"
+                                onClick={() => startBudgetEdit(k.id, k.budget_usd)}
+                                title="Edit budget"
+                                className="rounded p-0.5 text-[var(--muted)] opacity-50 hover:opacity-100 hover:text-white"
+                              >
+                                ✎
+                              </button>
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           {fmtUsd(k.spent_usd)}
